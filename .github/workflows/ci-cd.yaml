@@ -1,0 +1,49 @@
+name: CI-CD-EKS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: 📥 Descargar código del repositorio
+        uses: actions/checkout@v4
+
+      - name: 🔐 Configurar credenciales de AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: us-east-1
+
+      - name: 🛠️ Crear repositorio ECR si no existe
+        run: |
+          aws ecr describe-repositories --repository-names flask-app --region us-east-1 || aws ecr create-repository --repository-name flask-app --region us-east-1
+
+      - name:  Autenticarse en Amazon ECR
+        run: |
+          aws ecr get-login-password --region us-east-1 |
+          docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+
+      - name: 🏗️ Construir imagen Docker
+        run: |
+          docker build -t flask-app ./app
+
+      - name: 📦 Etiquetar imagen para ECR
+        run: |
+          docker tag flask-app:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/flask-app:latest
+
+      - name: 🚀 Subir imagen a Amazon ECR
+        run: |
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/flask-app:latest
+
+      - name: 🔄 Actualizar kubeconfig para conectarse a EKS
+        run: aws eks update-kubeconfig --name project03-eks
+
+      - name: 🚢 Desplegar aplicación en EKS
+        run: kubectl apply -f k8s/
