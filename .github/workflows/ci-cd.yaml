@@ -61,5 +61,8 @@ jobs:
       - name: � Actualizar kubeconfig para conectarse a EKS
         run: aws eks update-kubeconfig --name project03-eks
 
-      - name: 🚢 Desplegar aplicación en EKS
+      - name: 🔧 Reemplazar ID de cuenta en manifiestos
+        run: sed -i "s|<ACCOUNT_ID>|${{ secrets.AWS_ACCOUNT_ID }}|g" k8s/*.yaml
+
+      - name: � Desplegar aplicación en EKS
         run: kubectl apply -f k8s/
